@@ -1,0 +1,11 @@
+{
+  "name": "AI Documentary Maker",
+  "short_name": "Doc Maker",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#101827",
+  "description": "Free AI Documentary Maker",
+  "orientation": "any"
+}
