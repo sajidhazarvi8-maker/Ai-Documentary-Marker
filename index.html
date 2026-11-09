@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101827"><link rel="manifest" href="manifest.webmanifest">
+<title>AI Documentary Maker — Free MVP</title>
+<style>
+:root{--bg:#0b1220;--panel:#131e30;--panel2:#1a2940;--line:#2a3b55;--txt:#eef4ff;--muted:#a9b8cc;--accent:#66e0b5;--gold:#ffd45e}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0b1220,#111d30);color:var(--txt);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:22px 16px 16px;position:sticky;top:0;background:#0b1220ee;backdrop-filter:blur(12px);z-index:4;border-bottom:1px solid var(--line)}
+h1{font-size:21px;margin:0 0 5px}header p{margin:0;color:var(--muted);font-size:13px}
+main{max-width:850px;margin:auto;padding:14px;display:grid;gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:15px}
+h2{font-size:16px;margin:0 0 12px}.hint{font-size:12px;color:var(--muted);line-height:1.5}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 6px}
+textarea,input,select{width:100%;border:1px solid var(--line);border-radius:10px;background:#0d1727;color:var(--txt);padding:11px;font:inherit}
+textarea{min-height:135px;resize:vertical}.row{display:flex;gap:9px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+button{border:0;border-radius:11px;padding:12px 15px;font-weight:700;background:var(--accent);color:#092017;font-size:14px;cursor:pointer}
+button.secondary{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}button:disabled{opacity:.45}
+.scene{border:1px solid var(--line);border-radius:12px;padding:11px;margin:9px 0;background:#0e1929}
+.scene-top{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700;font-size:13px}
+.scene textarea{min-height:65px;margin-top:8px}.scene input{margin-top:8px}
+.pill{font-size:11px;color:var(--accent);border:1px solid #2b695a;border-radius:20px;padding:3px 8px}
+#status{color:var(--gold);font-size:13px;min-height:20px;margin-top:8px}
+progress{width:100%;height:8px;accent-color:var(--accent)}
+canvas{width:100%;aspect-ratio:16/9;background:#05080e;border-radius:12px}
+footer{padding:0 16px 30px;text-align:center;color:var(--muted);font-size:11px}
+.small{font-size:12px}.danger{color:#ffb0a8}
+</style></head>
+<body>
+<header><h1>🎬 AI Documentary Maker</h1><p>Free mobile-first documentary editor · local prototype</p></header>
+<main>
+<section class="card">
+<h2>1 · Documentary script</h2>
+<label for="script">Paste your script (each paragraph becomes a scene)</label>
+<textarea id="script" placeholder="Paste your documentary narration here.&#10;&#10;Separate scenes with a blank line."></textarea>
+<div class="row" style="margin-top:10px"><button id="makeScenes">Create scene plan</button><button class="secondary" id="sample">Load sample script</button></div>
+<p class="hint">This starter version splits your script into scenes. It does not yet invent or generate AI footage automatically.</p>
+</section>
+<section class="card">
+<h2>2 · Scene visuals</h2>
+<p class="hint">Add one image or video per scene. Images are animated with a slow cinematic zoom. Your selected media stays on your device.</p>
+<div id="scenes"><p class="hint">Create a scene plan to begin.</p></div>
+</section>
+<section class="card">
+<h2>3 · Sound and style</h2>
+<div class="row">
+<div><label>Voice-over audio (optional)</label><input id="voice" type="file" accept="audio/*"></div>
+<div><label>Background music (optional)</label><input id="music" type="file" accept="audio/*"></div>
+</div>
+<div class="row">
+<div><label>Aspect ratio</label><select id="ratio"><option value="16:9">16:9 · Documentary</option><option value="9:16">9:16 · Shorts / Reels</option></select></div>
+<div><label>Scene duration (seconds)</label><input id="duration" type="number" min="2" max="30" value="6"></div>
+</div>
+<div class="row">
+<div><label>Colour grade</label><select id="grade"><option value="cinema">Cinematic contrast</option><option value="warm">Warm documentary</option><option value="cool">Cool dramatic</option><option value="none">Natural</option></select></div>
+<div><label>Transition</label><select id="transition"><option value="fade">Fade</option><option value="cut">Hard cut</option></select></div>
+</div>
+<p class="hint">Add a recorded narration and music track for a complete audio mix. This prototype does not synthesize a downloadable voice track yet.</p>
+</section>
+<section class="card">
+<h2>4 · Preview and export</h2>
+<canvas id="preview" width="1280" height="720"></canvas>
+<div class="row" style="margin-top:10px"><button id="previewBtn" class="secondary">Preview</button><button id="exportBtn">Render video</button></div>
+<progress id="progress" max="100" value="0"></progress><div id="status"></div>
+<p class="hint">Export uses your browser's video recorder. Keep this page open while rendering. For best results use Chrome and keep the screen awake. Export support depends on your Android browser.</p>
+</section>
+<section class="card">
+<h2>What this free MVP can and cannot do</h2>
+<p class="small">✓ Script-to-scenes · image/video uploads · animated captions · cinematic colour filters · fade transitions · voice/music track mixing · MP4/WebM browser export where supported.</p>
+<p class="small danger">Not included yet: automatic AI image/video generation, automatic script writing, automatic voice generation, guaranteed MP4 on every phone, or unlimited free cloud rendering. These require additional models/services or a later server component.</p>
+</section>
+</main>
+<footer>Prototype · Your media is processed in your browser and is not uploaded by this app.</footer>
+<script>
+const $=id=>document.getElementById(id);
+let scenes=[], mediaURLs=[], audioURLs=[], playing=false;
+const canvas=$('preview'),ctx=canvas.getContext('2d');
+function setStatus(s){$('status').textContent=s}
+function revoke(arr){arr.forEach(u=>URL.revokeObjectURL(u));arr.length=0}
+function makeScenes(){
+ const raw=$('script').value.trim(); if(!raw){setStatus('Paste a script first.');return}
+ scenes=raw.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean).map((text,i)=>({text,file:null,url:null,type:null}));
+ renderScenes(); setStatus(`${scenes.length} scenes created. Add a visual to each scene.`);
+}
+function renderScenes(){
+ const host=$('scenes');host.innerHTML='';
+ scenes.forEach((s,i)=>{
+  const d=document.createElement('div');d.className='scene';
+  const top=document.createElement('div');top.className='scene-top';
+  top.innerHTML=`<span>SCENE ${String(i+1).padStart(2,'0')}</span><span class="pill">${s.file?'VISUAL ADDED':'NEEDS VISUAL'}</span>`;
+  const t=document.createElement('textarea');t.value=s.text;t.setAttribute('aria-label','Scene narration');t.addEventListener('input',()=>s.text=t.value);
+  const f=document.createElement('input');f.type='file';f.accept='image/*,video/*';f.addEventListener('change',()=>{if(s.url)URL.revokeObjectURL(s.url);s.file=f.files[0]||null;s.type=s.file?(s.file.type.startsWith('video/')?'video':'image'):null;s.url=s.file?URL.createObjectURL(s.file):null;renderScenes();});
+  d.append(top,t,f);host.append(d);
+ });
+}
+$('makeScenes').onclick=makeScenes;
+$('sample').onclick=()=>{$('script').value='The Roman Empire began as a small city-state in Italy and gradually expanded across the Mediterranean.\\n\\nIts roads, armies and political system connected a vast territory, shaping law, language and trade.\\n\\nOver time, economic strain, political instability and invasions weakened the western empire.\\n\\nIn 476 CE, the last western emperor was deposed, marking a conventional end to the Western Roman Empire.';makeScenes()};
+function fitCanvas(){let vertical=$('ratio').value==='9:16';canvas.width=vertical?720:1280;canvas.height=vertical?1280:720}
+function drawText(text,progress=0){
+ const words=text.split(/\s+/).filter(Boolean);if(!words.length)return;
+ const count=Math.max(1,Math.ceil(words.length*progress));const line=words.slice(0,count).join(' ');
+ ctx.font=`bold ${Math.round(canvas.width*.042)}px Arial`;ctx.textAlign='center';ctx.textBaseline='middle';
+ const max=canvas.width*.84,parts=[];let current='';
+ for(const w of line.split(' ')){let test=current?current+' '+w:w;if(ctx.measureText(test).width>max&&current){parts.push(current);current=w}else current=test}if(current)parts.push(current);
+ const lineH=canvas.width*.055,y=canvas.height*.79-(parts.length-1)*lineH/2;
+ parts.forEach((p,i)=>{ctx.lineWidth=canvas.width*.008;ctx.strokeStyle='#07101c';ctx.fillStyle='#fff';ctx.strokeText(p,canvas.width/2,y+i*lineH);ctx.fillText(p,canvas.width/2,y+i*lineH)});
+}
+function drawScene(index,elapsed=0,fade=1){
+ const s=scenes[index];ctx.fillStyle='#05080e';ctx.fillRect(0,0,canvas.width,canvas.height);
+ if(s&&s.url){
+  if(s.type==='image'){
+   const im=assetCache.get(s.url);if(im&&im.complete){let scale=Math.max(canvas.width/im.width,canvas.height/im.height)*(1+.06*elapsed);let w=im.width*scale,h=im.height*scale;ctx.drawImage(im,(canvas.width-w)/2,(canvas.height-h)/2,w,h)}
+  }else{
+   const v=videoCache.get(s.url);if(v&&v.readyState>=2){let scale=Math.max(canvas.width/v.videoWidth,canvas.height/v.videoHeight);let w=v.videoWidth*scale,h=v.videoHeight*scale;ctx.drawImage(v,(canvas.width-w)/2,(canvas.height-h)/2,w,h)}
+  }
+ }else{
+  const g=ctx.createLinearGradient(0,0,canvas.width,canvas.height);g.addColorStop(0,'#203b58');g.addColorStop(1,'#101827');ctx.fillStyle=g;ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ffffff22';ctx.font=`bold ${canvas.width*.18}px Arial`;ctx.textAlign='center';ctx.fillText(String(index+1).padStart(2,'0'),canvas.width/2,canvas.height*.48);
+ }
+ const grade=$('grade').value;
+ if(grade!=='none'){ctx.fillStyle=grade==='warm'?'rgba(255,150,65,.10)':grade==='cool'?'rgba(45,110,190,.14)':'rgba(0,12,28,.18)';ctx.fillRect(0,0,canvas.width,canvas.height)}
+ const vignette=ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.width*.2,canvas.width/2,canvas.height/2,canvas.width*.8);vignette.addColorStop(0,'transparent');vignette.addColorStop(1,'rgba(0,0,0,.48)');ctx.fillStyle=vignette;ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle='#66e0b5';ctx.font=`bold ${canvas.width*.022}px Arial`;ctx.textAlign='left';ctx.fillText('DOCUMENTARY',canvas.width*.06,canvas.height*.09);
+ drawText(s?s.text:'Add a script and scene visuals',Math.min(1,Math.max(.12,elapsed)));
+ if(fade<1){ctx.fillStyle=`rgba(0,0,0,${1-fade})`;ctx.fillRect(0,0,canvas.width,canvas.height)}
+}
+const assetCache=new Map(),videoCache=new Map();
+function prepareAssets(){scenes.forEach(s=>{if(s.url&&!assetCache.has(s.url)){if(s.type==='image'){let im=new Image();im.src=s.url;assetCache.set(s.url,im)}else{let v=document.createElement('video');v.src=s.url;v.muted=true;v.playsInline=true;v.preload='auto';videoCache.set(s.url,v)}}})}
+function preview(){if(!scenes.length){setStatus('Create scenes first.');return}fitCanvas();prepareAssets();let i=0,start=performance.now(),dur=Number($('duration').value)||6;playing=true;function tick(now){if(!playing)return;let elapsed=(now-start)/1000;if(elapsed>dur){i=(i+1)%scenes.length;start=now;elapsed=0}drawScene(i,elapsed/dur,1);requestAnimationFrame(tick)}requestAnimationFrame(tick)}
+$('previewBtn').onclick=preview;
+$('exportBtn').onclick=async()=>{
+ if(!scenes.length){setStatus('Create scenes first.');return}
+ if(!canvas.captureStream||!window.MediaRecorder){setStatus('This browser does not support video export. Try Chrome on Android.');return}
+ playing=false;fitCanvas();prepareAssets();$('exportBtn').disabled=true;$('progress').value=0;
+ const stream=canvas.captureStream(30);let audioCtx=null, dest=null;
+ try{
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();dest=audioCtx.createMediaStreamDestination();
+  for(const id of ['voice','music']){const file=$(id).files[0];if(file){const a=new Audio(URL.createObjectURL(file));a.crossOrigin='anonymous';a.loop=id==='music';a.volume=id==='music'?.24:1;const src=audioCtx.createMediaElementSource(a);src.connect(dest);src.connect(audioCtx.destination);await a.play().catch(()=>{});audioURLs.push(a.src)}}
+  dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+ }catch(e){setStatus('Audio mix unavailable; rendering video without mixed audio.')}
+ let mime=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/webm;codecs=vp9,opus','video/webm'].find(x=>MediaRecorder.isTypeSupported(x))||'';
+ let rec;try{rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined)}catch(e){setStatus('Video recorder could not start on this browser.');$('exportBtn').disabled=false;return}
+ const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+ rec.onstop=()=>{const blob=new Blob(chunks,{type:rec.mimeType||'video/webm'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='documentary.'+(blob.type.includes('mp4')?'mp4':'webm');a.textContent='Download rendered video';a.style.display='block';a.style.marginTop='10px';$('status').innerHTML='Render complete. ';$('status').append(a);$('exportBtn').disabled=false;stream.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close()};
+ const dur=Number($('duration').value)||6,total=dur*scenes.length;let start=performance.now();rec.start(250);
+ function renderFrame(now){let elapsed=(now-start)/1000;if(elapsed>=total){drawScene(scenes.length-1,1);rec.stop();$('progress').value=100;return}
+ let idx=Math.min(scenes.length-1,Math.floor(elapsed/dur)),within=(elapsed%dur)/dur;let fade=$('transition').value==='fade'?Math.min(1,within/.12,(1-within)/.12):1;
+ drawScene(idx,within,fade);$('progress').value=Math.round(elapsed/total*100);requestAnimationFrame(renderFrame)}
+ requestAnimationFrame(renderFrame);
+};
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script></body></html>
